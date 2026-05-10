@@ -141,12 +141,37 @@ router.put('/update/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
     const { 
+      userId,
+      fullName,
+      mobile,
+      email,
       designation, 
       department, 
       joiningDate, 
       salary,
-      // Ignore address and other fields not in staff table
     } = req.body;
+
+    // Update user info if provided
+    if (userId && (fullName !== undefined || email !== undefined || mobile !== undefined || designation !== undefined)) {
+      const userUpdateData = {};
+      if (fullName !== undefined) userUpdateData.full_name = fullName;
+      if (email !== undefined) userUpdateData.email = email;
+      if (mobile !== undefined) userUpdateData.mobile = mobile;
+      
+      // Update role based on designation
+      if (designation !== undefined) {
+        if (['Principal', 'Vice-Principal', 'Admin'].includes(designation)) {
+          userUpdateData.role = 6; // Full admin access
+        } else {
+          userUpdateData.role = 7; // Teaching staff (Teacher/Support Staff)
+        }
+      }
+
+      await supabaseAdmin
+        .from('users')
+        .update(userUpdateData)
+        .eq('id', userId);
+    }
 
     // Only update fields that exist in staff table
     const updateData = {};
@@ -206,32 +231,69 @@ router.delete('/delete/:id', async (req, res, next) => {
 // GET /api/staff/attendance - Get staff attendance
 router.get('/attendance', async (req, res, next) => {
   try {
-    const { date } = req.query;
+    const { date, staffId, startDate, endDate } = req.query;
 
-    let query = supabase
+    console.log('📊 Fetching attendance with params:', { date, staffId, startDate, endDate });
+
+    let query = supabaseAdmin
       .from('staff_attendance')
-      .select(`
-        *,
-        staff:staff_id (
-          id,
-          user:user_id (
-            full_name
-          )
-        )
-      `)
+      .select('*')
       .order('date', { ascending: false });
 
+    // Filter by specific date
     if (date) {
       query = query.eq('date', date);
     }
 
+    // Filter by staff member
+    if (staffId) {
+      query = query.eq('staff_id', staffId);
+    }
+
+    // Filter by date range
+    if (startDate && endDate) {
+      query = query.gte('date', startDate).lte('date', endDate);
+    } else if (startDate) {
+      query = query.gte('date', startDate);
+    } else if (endDate) {
+      query = query.lte('date', endDate);
+    }
+
     const { data: attendance, error } = await query;
 
+    console.log('📊 Query result:', { 
+      count: attendance?.length || 0, 
+      error: error?.message,
+      sample: attendance?.[0]
+    });
+
     if (error) {
+      console.error('Attendance fetch error:', error);
       throw errorResponse('Failed to fetch staff attendance', 500);
     }
 
-    res.json(successResponse(attendance, 'Staff attendance fetched successfully'));
+    // Calculate statistics if filtering by staff
+    let stats = null;
+    if (staffId && attendance) {
+      const totalDays = attendance.length;
+      const present = attendance.filter(a => a.status === 'Present').length;
+      const absent = attendance.filter(a => a.status === 'Absent').length;
+      const leave = attendance.filter(a => a.status === 'Leave').length;
+      const percentage = totalDays > 0 ? Math.round((present / totalDays) * 100) : 0;
+
+      stats = {
+        totalDays,
+        present,
+        absent,
+        leave,
+        percentage
+      };
+    }
+
+    res.json(successResponse({
+      attendance: attendance || [],
+      stats
+    }, 'Staff attendance fetched successfully'));
 
   } catch (error) {
     next(error);
@@ -241,28 +303,62 @@ router.get('/attendance', async (req, res, next) => {
 // POST /api/staff/attendance - Mark staff attendance
 router.post('/attendance', async (req, res, next) => {
   try {
-    const { staffId, date, status, remarks } = req.body;
+    const { date, records } = req.body;
 
-    if (!staffId || !date || !status) {
-      throw errorResponse('Staff ID, date, and status are required', 400);
+    if (!date || !records || !Array.isArray(records)) {
+      throw errorResponse('Date and attendance records are required', 400);
     }
 
-    const { data: attendance, error } = await supabaseAdmin
+    // Prepare attendance records for bulk insert
+    const attendanceRecords = records.map(record => ({
+      staff_id: record.staffId,
+      date: date,
+      status: record.status,
+      remarks: record.remarks || null
+    }));
+
+    // Check if attendance already exists for this date
+    const { data: existingRecords } = await supabaseAdmin
       .from('staff_attendance')
-      .insert({
-        staff_id: staffId,
-        date,
-        status,
-        remarks: remarks || null
-      })
-      .select()
-      .single();
+      .select('id, staff_id')
+      .eq('date', date);
 
-    if (error) {
-      throw errorResponse('Failed to mark attendance', 500);
+    if (existingRecords && existingRecords.length > 0) {
+      // Update existing records
+      const updatePromises = attendanceRecords.map(async (record) => {
+        const existing = existingRecords.find(e => e.staff_id === record.staff_id);
+        if (existing) {
+          return supabaseAdmin
+            .from('staff_attendance')
+            .update({
+              status: record.status,
+              remarks: record.remarks
+            })
+            .eq('id', existing.id);
+        } else {
+          return supabaseAdmin
+            .from('staff_attendance')
+            .insert(record);
+        }
+      });
+
+      await Promise.all(updatePromises);
+    } else {
+      // Insert new records
+      const { error: insertError } = await supabaseAdmin
+        .from('staff_attendance')
+        .insert(attendanceRecords);
+
+      if (insertError) {
+        console.error('Attendance insert error:', insertError);
+        throw errorResponse('Failed to mark attendance', 500);
+      }
     }
 
-    res.status(201).json(successResponse(attendance, 'Attendance marked successfully'));
+    res.status(201).json(successResponse({
+      date,
+      count: attendanceRecords.length
+    }, 'Attendance marked successfully'));
 
   } catch (error) {
     next(error);
