@@ -53,4 +53,36 @@ router.get('/profile', async (req, res, next) => {
   }
 });
 
+// PUT /api/users/profile - Update user profile
+router.put('/profile', async (req, res, next) => {
+  try {
+    const { userId, fullName, email } = req.body;
+
+    if (!userId) {
+      throw errorResponse('User ID is required', 400);
+    }
+
+    // Update user basic info
+    const updateData = {};
+    if (fullName !== undefined) updateData.full_name = fullName;
+    if (email !== undefined) updateData.email = email;
+
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .update(updateData)
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (userError) {
+      throw errorResponse('Failed to update profile', 500);
+    }
+
+    res.json(successResponse(user, 'Profile updated successfully'));
+
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;
