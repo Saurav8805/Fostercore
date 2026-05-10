@@ -32,6 +32,84 @@ router.get('/classes', async (req, res, next) => {
   }
 });
 
+// GET /api/config/class-stats - Get class statistics with student count and teachers
+router.get('/class-stats', async (req, res, next) => {
+  try {
+    const { supabaseAdmin } = require('../config/database');
+    
+    // Fetch all students with their class, section, and teacher info
+    const { data: students, error: studentsError } = await supabaseAdmin
+      .from('students')
+      .select(`
+        id,
+        class,
+        section,
+        teacher:teacher_id (
+          id,
+          full_name
+        )
+      `);
+
+    if (studentsError) {
+      console.error('Failed to fetch students for class stats:', studentsError);
+      throw errorResponse('Failed to fetch class statistics', 500);
+    }
+
+    // Group students by class and calculate statistics
+    const classStatsMap = {};
+
+    students.forEach(student => {
+      const className = student.class || 'Unknown';
+      
+      if (!classStatsMap[className]) {
+        classStatsMap[className] = {
+          name: className,
+          studentCount: 0,
+          sections: new Set(),
+          teachers: new Set()
+        };
+      }
+
+      classStatsMap[className].studentCount++;
+      
+      if (student.section) {
+        classStatsMap[className].sections.add(student.section);
+      }
+      
+      if (student.teacher?.full_name) {
+        classStatsMap[className].teachers.add(student.teacher.full_name);
+      }
+    });
+
+    // Convert to array and format
+    const classStats = Object.values(classStatsMap).map(cls => ({
+      name: cls.name,
+      studentCount: cls.studentCount,
+      sections: Array.from(cls.sections).sort(),
+      teachers: Array.from(cls.teachers).sort()
+    }));
+
+    // Sort by class name
+    classStats.sort((a, b) => {
+      const order = ['Nursery', 'LKG', 'UKG', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+      const indexA = order.indexOf(a.name);
+      const indexB = order.indexOf(b.name);
+      
+      if (indexA !== -1 && indexB !== -1) {
+        return indexA - indexB;
+      }
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    res.json(successResponse(classStats, 'Class statistics fetched successfully'));
+
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/config/sections - Get all sections
 router.get('/sections', async (req, res, next) => {
   try {
