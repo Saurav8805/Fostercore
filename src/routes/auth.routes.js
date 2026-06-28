@@ -34,23 +34,44 @@ router.post('/login', async (req, res, next) => {
 
     // Get additional user data based on role
     let userData = null;
+    let roleName = null;
     
     if (user.role === 19) {
-      // Student
+      // Student/Parent
       const { data: studentData } = await supabase
         .from('students')
         .select('*')
         .eq('user_id', user.id)
         .single();
       userData = studentData;
-    } else if (user.role === 6 || user.role === 7 || user.role === 8) {
-      // Staff/Faculty/Teacher
+      roleName = 'Student/Parent';
+    } else if (user.role === 6) {
+      // Principal/Vice-Principal
       const { data: staffData } = await supabase
         .from('staff')
         .select('*')
         .eq('user_id', user.id)
         .single();
       userData = staffData;
+      roleName = 'Principal/Vice-Principal';
+    } else if (user.role === 7) {
+      // Teacher
+      const { data: staffData } = await supabase
+        .from('staff')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+      userData = staffData;
+      roleName = 'Teacher';
+    } else if (user.role === 8) {
+      // Support Staff
+      const { data: staffData } = await supabase
+        .from('staff')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+      userData = staffData;
+      roleName = 'Support Staff';
     }
 
     // Return user data (excluding password)
@@ -59,6 +80,7 @@ router.post('/login', async (req, res, next) => {
     res.json(successResponse({
       user: {
         ...userWithoutPassword,
+        roleName,
         additionalData: userData
       }
     }, 'Login successful'));

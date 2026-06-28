@@ -160,10 +160,12 @@ router.put('/update/:id', async (req, res, next) => {
       
       // Update role based on designation
       if (designation !== undefined) {
-        if (['Principal', 'Vice-Principal', 'Admin'].includes(designation)) {
-          userUpdateData.role = 6; // Full admin access
+        if (['Principal', 'Vice-Principal'].includes(designation)) {
+          userUpdateData.role = 6; // Principal/Vice-Principal - Full Access
+        } else if (['Teacher', 'Senior Teacher', 'Subject Teacher', 'Class Teacher'].includes(designation)) {
+          userUpdateData.role = 7; // Teachers - Based on assignments
         } else {
-          userUpdateData.role = 7; // Teaching staff (Teacher/Support Staff)
+          userUpdateData.role = 8; // Support Staff - Limited Access
         }
       }
 
