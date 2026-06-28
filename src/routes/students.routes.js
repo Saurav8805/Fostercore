@@ -46,13 +46,17 @@ router.post('/admit', async (req, res, next) => {
   try {
     const { 
       studentName, 
-      dob, 
+      dob,
+      age,
+      admissionDate,
+      aadharNumber,
       gender, 
       studentClass, 
       section,
       rollNo,
       bloodGroup,
-      parentName, 
+      parentName,
+      motherName,
       mobile, 
       email, 
       address,
@@ -103,17 +107,27 @@ router.post('/admit', async (req, res, next) => {
 
     // Create student record
     const rollNoValue = parseIntSafe(rollNo);
+    const ageValue = parseIntSafe(age);
     
     const { data: student, error: studentError } = await supabaseAdmin
       .from('students')
       .insert({
         user_id: user.id,
         teacher_id: teacherId || null,
+        student_name: studentName,
+        mobile: mobile,
+        email: email || null,
         class: studentClass,
         section: section || 'A',
         roll_no: rollNoValue,
         dob: dob || null,
+        age: ageValue,
+        gender: gender || null,
+        admission_date: admissionDate || null,
+        aadhar_number: aadharNumber || null,
         blood_group: bloodGroup || null,
+        parent_name: parentName || null,
+        mother_name: motherName || null,
         address: address || null,
         city: city || null,
         state: state || null,
