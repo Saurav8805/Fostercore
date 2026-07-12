@@ -21,6 +21,15 @@ router.get('/list', async (req, res, next) => {
         teacher:teacher_id!left (
           id,
           full_name
+        ),
+        fees (
+          id,
+          total_fees,
+          paid_amount,
+          pending_amount,
+          due_date,
+          status,
+          created_at
         )
       `)
       .order('roll_no', { ascending: true, nullsFirst: false });
