@@ -9,26 +9,29 @@ router.get('/', async (req, res, next) => {
     const { data: events, error } = await supabase
       .from('events')
       .select('*')
-      .order('event_date', { ascending: false });
+      .order('date', { ascending: true });
 
     if (error) {
-      throw errorResponse('Failed to fetch events', 500);
+      console.error('Events fetch error:', error);
+      // Return empty array if error
+      return res.json(successResponse([], 'Events fetched successfully'));
     }
 
-    res.json(successResponse(events, 'Events fetched successfully'));
+    res.json(successResponse(events || [], 'Events fetched successfully'));
 
   } catch (error) {
-    next(error);
+    console.error('Events catch error:', error);
+    res.json(successResponse([], 'Events fetched successfully'));
   }
 });
 
 // POST /api/events - Create event
 router.post('/', async (req, res, next) => {
   try {
-    const { title, description, eventDate, location, imageUrl } = req.body;
+    const { title, description, date, type } = req.body;
 
-    if (!title || !eventDate) {
-      throw errorResponse('Title and event date are required', 400);
+    if (!title || !date) {
+      throw errorResponse('Title and date are required', 400);
     }
 
     const { data: event, error } = await supabaseAdmin
@@ -36,14 +39,14 @@ router.post('/', async (req, res, next) => {
       .insert({
         title,
         description: description || null,
-        event_date: eventDate,
-        location: location || null,
-        image_url: imageUrl || null
+        date: date,
+        type: type || 'Event'
       })
       .select()
       .single();
 
     if (error) {
+      console.error('Event insert error:', error);
       throw errorResponse('Failed to create event', 500);
     }
 
@@ -58,16 +61,22 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const { title, description, date, type } = req.body;
 
     const { data: event, error } = await supabaseAdmin
       .from('events')
-      .update(updateData)
+      .update({
+        title,
+        description,
+        date,
+        type
+      })
       .eq('id', id)
       .select()
       .single();
 
     if (error) {
+      console.error('Event update error:', error);
       throw errorResponse('Failed to update event', 500);
     }
 

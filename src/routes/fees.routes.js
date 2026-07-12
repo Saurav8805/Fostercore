@@ -29,33 +29,72 @@ router.get('/my-fees', async (req, res, next) => {
   }
 });
 
-// PUT /api/fees/update - Update fee payment
+// PUT /api/fees/update - Create or update student fees
 router.put('/update', async (req, res, next) => {
   try {
-    const { feeId, amountPaid, paymentDate, paymentMethod, remarks } = req.body;
+    const { studentId, totalFees, paidAmount, pendingAmount, dueDate, status } = req.body;
 
-    if (!feeId || !amountPaid) {
-      throw errorResponse('Fee ID and amount paid are required', 400);
+    if (!studentId || totalFees === undefined) {
+      throw errorResponse('Student ID and total fees are required', 400);
     }
 
-    const { data: fee, error } = await supabaseAdmin
+    // Check if fees already exist for this student
+    const { data: existingFees, error: fetchError } = await supabase
       .from('fees')
-      .update({
-        amount_paid: amountPaid,
-        payment_date: paymentDate || new Date().toISOString(),
-        payment_method: paymentMethod || null,
-        remarks: remarks || null,
-        status: 'paid'
-      })
-      .eq('id', feeId)
-      .select()
-      .single();
+      .select('id')
+      .eq('student_id', studentId)
+      .maybeSingle();
 
-    if (error) {
-      throw errorResponse('Failed to update fee', 500);
+    if (fetchError) {
+      console.error('Error checking existing fees:', fetchError);
+      throw errorResponse('Failed to check existing fees', 500);
     }
 
-    res.json(successResponse(fee, 'Fee updated successfully'));
+    let result;
+    if (existingFees) {
+      // Update existing fees
+      const { data: updatedFee, error: updateError } = await supabaseAdmin
+        .from('fees')
+        .update({
+          total_fees: totalFees,
+          paid_amount: paidAmount || 0,
+          pending_amount: pendingAmount || (totalFees - (paidAmount || 0)),
+          due_date: dueDate,
+          status: status || 'Pending',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingFees.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Fee update error:', updateError);
+        throw errorResponse('Failed to update fees', 500);
+      }
+      result = updatedFee;
+    } else {
+      // Create new fees
+      const { data: newFee, error: insertError } = await supabaseAdmin
+        .from('fees')
+        .insert({
+          student_id: studentId,
+          total_fees: totalFees,
+          paid_amount: paidAmount || 0,
+          pending_amount: pendingAmount || (totalFees - (paidAmount || 0)),
+          due_date: dueDate,
+          status: status || 'Pending'
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Fee insert error:', insertError);
+        throw errorResponse('Failed to create fees', 500);
+      }
+      result = newFee;
+    }
+
+    res.json(successResponse(result, 'Fees updated successfully'));
 
   } catch (error) {
     next(error);

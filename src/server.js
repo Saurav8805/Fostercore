@@ -18,6 +18,7 @@ const eventsRoutes = require('./routes/events.routes');
 const galleryRoutes = require('./routes/gallery.routes');
 const usersRoutes = require('./routes/users.routes');
 const configRoutes = require('./routes/config.routes');
+const salaryRoutes = require('./routes/salary.routes');
 
 // Import middleware
 const errorMiddleware = require('./middleware/error.middleware');
@@ -70,6 +71,7 @@ app.use('/api/events', eventsRoutes);
 app.use('/api/gallery', galleryRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/config', configRoutes);
+app.use('/api/salary', salaryRoutes);
 
 // 404 handler
 app.use((req, res) => {
