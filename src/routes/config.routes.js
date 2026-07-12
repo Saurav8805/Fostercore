@@ -180,16 +180,25 @@ router.get('/designations', async (req, res, next) => {
 // GET /api/config/constants - Get all constants
 router.get('/constants', async (req, res, next) => {
   try {
+    const { ROLES } = require('../config/auth');
+    
     const constants = {
       roles: {
-        ADMIN: 8,
-        FACULTY: 6,
-        STUDENT: 19
+        PRINCIPAL: ROLES.PRINCIPAL,      // 6 - Principal & Vice-Principal (Full Access)
+        TEACHER: ROLES.TEACHER,          // 7 - Teachers (Access based on assignments)
+        STAFF: ROLES.STAFF,              // 8 - Support Staff (Limited Access)
+        STUDENT: ROLES.STUDENT,          // 19 - Students/Parents (Limited Access)
+        PARENT: ROLES.PARENT             // 19 - Parents (Same as Student)
+      },
+      designations: {
+        principals: ['Principal', 'Vice-Principal'],
+        teachers: ['Teacher', 'Senior Teacher', 'Subject Teacher', 'Class Teacher'],
+        staff: ['Admin Staff', 'Support Staff', 'Librarian', 'Lab Assistant', 'Accountant', 'Clerk']
       },
       bloodGroups: ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'],
-      attendanceStatus: ['Present', 'Absent', 'Leave'],
+      attendanceStatus: ['Present', 'Absent', 'Leave', 'Half Day'],
       behaviourRatings: [1, 2, 3, 4, 5],
-      feeStatus: ['Pending', 'Paid', 'Overdue']
+      feeStatus: ['Pending', 'Paid', 'Overdue', 'Partial']
     };
 
     res.json(successResponse(constants, 'Constants fetched successfully'));
