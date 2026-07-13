@@ -30,6 +30,11 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(helmet()); // Security headers
 
+// Enable compression for all responses (reduces payload size by 70-90%)
+// Uncomment after running: npm install compression
+// const compression = require('compression');
+// app.use(compression());
+
 const allowedOrigins = [
   'http://localhost:3001',
   'http://localhost:3000',
