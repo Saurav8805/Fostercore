@@ -8,7 +8,7 @@ router.get('/list', async (req, res, next) => {
   try {
     const { studentClass, subject } = req.query;
 
-    let query = supabase
+    let query = supabaseAdmin
       .from('syllabus')
       .select('*')
       .order('created_at', { ascending: false });
