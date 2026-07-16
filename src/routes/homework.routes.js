@@ -8,9 +8,15 @@ router.get('/list', async (req, res, next) => {
   try {
     const { studentClass, section } = req.query;
 
-    let query = supabase
+    let query = supabaseAdmin
       .from('homework')
-      .select('*')
+      .select(`
+        *,
+        teacher:assigned_by (
+          id,
+          full_name
+        )
+      `)
       .order('created_at', { ascending: false });
 
     if (studentClass) {
@@ -24,9 +30,11 @@ router.get('/list', async (req, res, next) => {
     const { data: homework, error } = await query;
 
     if (error) {
+      console.error('❌ Fetch homework error:', error);
       throw errorResponse('Failed to fetch homework', 500);
     }
 
+    console.log('✅ Fetched homework:', homework);
     res.json(successResponse(homework, 'Homework fetched successfully'));
 
   } catch (error) {
@@ -37,32 +45,45 @@ router.get('/list', async (req, res, next) => {
 // POST /api/homework - Create homework
 router.post('/', async (req, res, next) => {
   try {
-    const { title, description, studentClass, section, subject, dueDate } = req.body;
+    const { description, studentClass, section, subject, dueDate, assignedBy } = req.body;
 
-    if (!title || !studentClass || !subject) {
-      throw errorResponse('Title, class, and subject are required', 400);
+    // Log the received data for debugging
+    console.log('📝 Creating homework with data:', req.body);
+
+    if (!studentClass || !subject || !description) {
+      throw errorResponse('Class, subject, and description are required', 400);
     }
+
+    // Prepare insert data - only include fields that exist in the table
+    const insertData = {
+      description,
+      class: studentClass,
+      subject,
+      due_date: dueDate
+    };
+
+    // Add optional fields if they exist in the table
+    if (section) insertData.section = section;
+    if (assignedBy) insertData.assigned_by = assignedBy;
+
+    console.log('💾 Insert data:', insertData);
 
     const { data: homework, error } = await supabaseAdmin
       .from('homework')
-      .insert({
-        title,
-        description: description || null,
-        class: studentClass,
-        section: section || null,
-        subject,
-        due_date: dueDate || null
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (error) {
-      throw errorResponse('Failed to create homework', 500);
+      console.error('❌ Database error:', error);
+      throw errorResponse(`Failed to create homework: ${error.message}`, 500);
     }
 
+    console.log('✅ Homework created successfully:', homework);
     res.status(201).json(successResponse(homework, 'Homework created successfully'));
 
   } catch (error) {
+    console.error('❌ Route error:', error);
     next(error);
   }
 });
@@ -71,7 +92,17 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    const { description, studentClass, section, subject, dueDate } = req.body;
+
+    const updateData = {
+      description,
+      class: studentClass,
+      subject,
+      due_date: dueDate
+    };
+
+    // Add optional fields
+    if (section) updateData.section = section;
 
     const { data: homework, error } = await supabaseAdmin
       .from('homework')
@@ -81,7 +112,8 @@ router.put('/:id', async (req, res, next) => {
       .single();
 
     if (error) {
-      throw errorResponse('Failed to update homework', 500);
+      console.error('❌ Update error:', error);
+      throw errorResponse(`Failed to update homework: ${error.message}`, 500);
     }
 
     res.json(successResponse(homework, 'Homework updated successfully'));
